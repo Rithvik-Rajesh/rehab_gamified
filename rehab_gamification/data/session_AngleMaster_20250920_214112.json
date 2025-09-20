@@ -1,0 +1,10 @@
+{
+    "game_name": "AngleMaster",
+    "timestamp": "20250920_214112",
+    "session_data": {
+        "score": 0,
+        "target_angles": [],
+        "achieved_angles": [],
+        "average_deviation": 0
+    }
+}

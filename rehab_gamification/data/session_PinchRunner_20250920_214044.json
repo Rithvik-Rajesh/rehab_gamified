@@ -1,0 +1,10 @@
+{
+    "game_name": "PinchRunner",
+    "timestamp": "20250920_214044",
+    "session_data": {
+        "score": 0,
+        "successful_pinches": 0,
+        "min_pinch_distance": 79.05694150420949,
+        "max_pinch_distance": 647.9753081715382
+    }
+}
