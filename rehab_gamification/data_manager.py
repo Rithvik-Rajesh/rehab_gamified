@@ -17,17 +17,21 @@ class DataManager:
 
     def save_session(self, game_name, session_data):
         """
-        Saves a game session's data to a JSON file.
+        Saves a game session's data to a JSON file with a more detailed structure.
         :param game_name: The name of the game.
         :param session_data: A dictionary containing the session's data.
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(self.data_folder, f"session_{game_name}_{timestamp}.json")
+        timestamp = datetime.now()
+        filename = os.path.join(self.data_folder, f"session_{game_name}_{timestamp.strftime('%Y%m%d_%H%M%S')}.json")
         
+        # Enhance the data structure
         data_to_save = {
-            "game_name": game_name,
-            "timestamp": timestamp,
-            "session_data": session_data
+            "metadata": {
+                "game_name": game_name,
+                "session_start_time": timestamp.isoformat(),
+                "version": "1.0"
+            },
+            "metrics": session_data
         }
         
         with open(filename, 'w') as f:
@@ -40,13 +44,17 @@ class DataManager:
         :return: A list of all session data dictionaries.
         """
         all_sessions = []
-        for filename in os.listdir(self.data_folder):
+        for filename in sorted(os.listdir(self.data_folder), reverse=True):
             if filename.endswith(".json"):
                 filepath = os.path.join(self.data_folder, filename)
                 with open(filepath, 'r') as f:
                     try:
-                        all_sessions.append(json.load(f))
-                    except json.JSONDecodeError:
-                        print(f"Warning: Could not decode JSON from {filename}")
+                        data = json.load(f)
+                        # Add filename for reference, can be useful for deletion or updates
+                        data['metadata']['filename'] = filename
+                        all_sessions.append(data)
+                    except (json.JSONDecodeError, KeyError) as e:
+                        print(f"Warning: Could not decode or parse JSON from {filename}. Error: {e}")
         return all_sessions
+
 

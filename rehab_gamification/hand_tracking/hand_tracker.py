@@ -99,3 +99,25 @@ class HandTracker:
             
         return angle
 
+    def get_pinch_gesture(self, lm_list, pinch_threshold=30):
+        """
+        Detects a pinch gesture and returns the status and position.
+        :param lm_list: The list of landmark positions.
+        :param pinch_threshold: The distance threshold to consider a pinch.
+        :return: A tuple (is_pinching, pinch_position).
+        """
+        if len(lm_list) >= 9:
+            thumb_tip = lm_list[4]
+            index_tip = lm_list[8]
+            
+            distance = self.calculate_distance(thumb_tip, index_tip)
+            
+            # Calculate the midpoint for the cursor position
+            pinch_x = (thumb_tip[1] + index_tip[1]) // 2
+            pinch_y = (thumb_tip[2] + index_tip[2]) // 2
+            
+            if distance < pinch_threshold:
+                return True, (pinch_x, pinch_y)
+        
+        return False, None
+

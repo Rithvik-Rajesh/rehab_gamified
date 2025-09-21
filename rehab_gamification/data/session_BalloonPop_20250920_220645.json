@@ -1,0 +1,11 @@
+{
+    "metadata": {
+        "game_name": "BalloonPop",
+        "session_start_time": "2025-09-20T22:06:45.630025",
+        "version": "1.0"
+    },
+    "metrics": {
+        "score": 0,
+        "balloons_popped": 0
+    }
+}

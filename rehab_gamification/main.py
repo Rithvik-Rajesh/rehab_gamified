@@ -1,14 +1,16 @@
 import pygame
 import sys
-from rehab_gamification.games.pinch_runner import PinchRunnerGame
-from rehab_gamification.games.angle_master import AngleMasterGame
+from datetime import datetime
+from rehab_gamification.games.balloon_pop import BalloonPopGame
+from rehab_gamification.games.game_2 import FingerPainterGame
+from rehab_gamification.games.maze_game import MazeGame
 from rehab_gamification.data_manager import DataManager
 
 class MainApp:
     """
     The main application class that runs the game menu, games, and dashboard.
     """
-    def __init__(self, width=800, height=600):
+    def __init__(self, width=1280, height=720):
         """
         Initializes the main application.
         :param width: The width of the screen.
@@ -29,7 +31,7 @@ class MainApp:
         self.data_manager = DataManager(data_folder='rehab_gamification/data')
 
         # Menu options
-        self.menu_options = ["Pinch Runner", "Angle Master", "Dashboard", "Quit"]
+        self.menu_options = ["Balloon Pop", "Finger Painter", "Maze Game", "Dashboard", "Quit"]
         self.buttons = []
 
     def _draw_text(self, text, font, color, surface, x, y):
@@ -42,14 +44,14 @@ class MainApp:
         """Displays the main menu and handles user input."""
         self.buttons.clear()
         self.screen.fill(self.white)
-        self._draw_text('Main Menu', self.font, self.black, self.screen, 400, 100)
+        self._draw_text('Main Menu', self.font, self.black, self.screen, self.screen.get_width() / 2, 100)
 
         y_pos = 200
         for option in self.menu_options:
-            button_rect = pygame.Rect(250, y_pos, 300, 50)
+            button_rect = pygame.Rect(self.screen.get_width() / 2 - 150, y_pos, 300, 50)
             self.buttons.append(button_rect)
             pygame.draw.rect(self.screen, self.gray, button_rect)
-            self._draw_text(option, self.small_font, self.black, self.screen, 400, y_pos + 25)
+            self._draw_text(option, self.small_font, self.black, self.screen, self.screen.get_width() / 2, y_pos + 25)
             y_pos += 70
 
         pygame.display.flip()
@@ -74,22 +76,29 @@ class MainApp:
         """Displays the dashboard with data from past sessions."""
         sessions = self.data_manager.load_all_sessions()
         self.screen.fill(self.white)
-        self._draw_text('Dashboard', self.font, self.black, self.screen, 400, 50)
+        self._draw_text('Dashboard', self.font, self.black, self.screen, self.screen.get_width() / 2, 50)
 
         if not sessions:
-            self._draw_text("No data available yet.", self.small_font, self.black, self.screen, 400, 300)
+            self._draw_text("No data available yet.", self.small_font, self.black, self.screen, self.screen.get_width() / 2, 300)
         else:
             y_pos = 120
-            for session in sorted(sessions, key=lambda x: x['timestamp'], reverse=True)[:10]: # Show last 10
-                game_name = session.get('game_name', 'N/A')
-                timestamp = session.get('timestamp', 'N/A').replace('_', ' ').split('.')[0]
-                score = session.get('session_data', {}).get('score', 'N/A')
+            for session in sessions[:15]: # Show last 15 sessions
+                game_name = session.get('metadata', {}).get('game_name', 'N/A')
+                timestamp_str = session.get('metadata', {}).get('session_start_time', 'N/A')
+                
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_str).strftime('%Y-%m-%d %H:%M')
+                except (ValueError, TypeError):
+                    timestamp = "Invalid Date"
+
+                metrics = session.get('metrics', {})
+                score = metrics.get('score', 'N/A')
                 
                 display_text = f"{timestamp} - {game_name} - Score: {score}"
-                self._draw_text(display_text, self.small_font, self.black, self.screen, 400, y_pos)
-                y_pos += 40
+                self._draw_text(display_text, self.small_font, self.black, self.screen, self.screen.get_width() / 2, y_pos)
+                y_pos += 30
 
-        self._draw_text("Click anywhere to return to menu", self.small_font, self.gray, self.screen, 400, 550)
+        self._draw_text("Click anywhere to return to menu", self.small_font, self.gray, self.screen, self.screen.get_width() / 2, self.screen.get_height() - 50)
         pygame.display.flip()
 
         waiting = True
@@ -106,10 +115,12 @@ class MainApp:
         while True:
             choice = self._main_menu()
 
-            if choice == "Pinch Runner":
-                self._run_game(PinchRunnerGame, "PinchRunner")
-            elif choice == "Angle Master":
-                self._run_game(AngleMasterGame, "AngleMaster")
+            if choice == "Balloon Pop":
+                self._run_game(BalloonPopGame, "BalloonPop")
+            elif choice == "Finger Painter":
+                self._run_game(FingerPainterGame, "FingerPainter")
+            elif choice == "Maze Game":
+                self._run_game(MazeGame, "MazeGame")
             elif choice == "Dashboard":
                 self._show_dashboard()
             elif choice == "Quit":
@@ -119,4 +130,5 @@ class MainApp:
 if __name__ == '__main__':
     app = MainApp()
     app.run()
+
 

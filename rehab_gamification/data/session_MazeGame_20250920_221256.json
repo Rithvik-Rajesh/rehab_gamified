@@ -1,0 +1,12 @@
+{
+    "metadata": {
+        "game_name": "MazeGame",
+        "session_start_time": "2025-09-20T22:12:56.251169",
+        "version": "1.0"
+    },
+    "metrics": {
+        "time_taken": 7.27,
+        "wall_touches": 111,
+        "completed": true
+    }
+}

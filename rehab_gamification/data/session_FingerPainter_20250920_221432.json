@@ -1,0 +1,13 @@
+{
+    "metadata": {
+        "game_name": "FingerPainter",
+        "session_start_time": "2025-09-20T22:14:32.356251",
+        "version": "1.0"
+    },
+    "metrics": {
+        "score": 100,
+        "targets_hit": 10,
+        "total_targets": 15,
+        "accuracy": 66.67
+    }
+}
