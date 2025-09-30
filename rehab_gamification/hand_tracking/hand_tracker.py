@@ -99,25 +99,48 @@ class HandTracker:
             
         return angle
 
-    def get_pinch_gesture(self, lm_list, pinch_threshold=30):
+    def get_hand_position(self, lm_list):
+        """
+        Calculates the center position of the palm.
+        :param lm_list: The list of landmark positions.
+        :return: The (x, y) center coordinate of the palm.
+        """
+        if len(lm_list) >= 10:
+            # Use landmark 9 (base of middle finger) as a stable point for hand position
+            return (lm_list[9][1], lm_list[9][2])
+        return (0, 0)
+
+    def get_pinch_midpoint(self, lm_list):
+        """
+        Calculates the midpoint between the thumb and index finger tips.
+        :param lm_list: The list of landmark positions.
+        :return: The (x, y) midpoint coordinate.
+        """
+        if len(lm_list) >= 9:
+            thumb_tip = lm_list[4]
+            index_tip = lm_list[8]
+            pinch_x = (thumb_tip[1] + index_tip[1]) // 2
+            pinch_y = (thumb_tip[2] + index_tip[2]) // 2
+            return (pinch_x, pinch_y)
+        return (0, 0)
+
+    def get_pinch_gesture(self, lm_list, pinch_threshold=40):
         """
         Detects a pinch gesture and returns the status and position.
         :param lm_list: The list of landmark positions.
         :param pinch_threshold: The distance threshold to consider a pinch.
         :return: A tuple (is_pinching, pinch_position).
         """
+        pinch_pos = self.get_pinch_midpoint(lm_list)
+        is_pinching = False
         if len(lm_list) >= 9:
             thumb_tip = lm_list[4]
             index_tip = lm_list[8]
             
             distance = self.calculate_distance(thumb_tip, index_tip)
             
-            # Calculate the midpoint for the cursor position
-            pinch_x = (thumb_tip[1] + index_tip[1]) // 2
-            pinch_y = (thumb_tip[2] + index_tip[2]) // 2
-            
             if distance < pinch_threshold:
-                return True, (pinch_x, pinch_y)
+                is_pinching = True
         
-        return False, None
+        return is_pinching, pinch_pos
 
