@@ -43,14 +43,15 @@ class MazeGame(BaseGame):
     """
     A game where the player navigates a maze with their hand.
     """
-    def __init__(self, screen, hand_tracker, cap):
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
         """
         Initializes the MazeGame.
         :param screen: The pygame screen to draw on.
         :param hand_tracker: The shared HandTracker instance.
         :param cap: The shared camera capture instance.
+        :param calibration_data: Calibration parameters.
         """
-        super().__init__(screen, hand_tracker, cap)
+        super().__init__(screen, hand_tracker, cap, calibration_data)
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
 

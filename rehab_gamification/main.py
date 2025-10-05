@@ -5,6 +5,7 @@ from rehab_gamification.games.balloon_pop import BalloonPopGame
 from rehab_gamification.games.game_2 import FingerPainterGame
 from rehab_gamification.games.maze_game import MazeGame
 from rehab_gamification.data_manager import DataManager
+from rehab_gamification.calibration import CalibrationScreen
 import cv2
 from rehab_gamification.hand_tracking.hand_tracker import HandTracker
 
@@ -118,48 +119,228 @@ class MainApp:
             pygame.display.flip()
 
     def _run_game(self, game_class, game_name):
-        """Runs a game, and saves the session data."""
-        game = game_class(self.screen, self.hand_tracker, self.cap)
+        """Runs a game with calibration, and saves the session data."""
+        # Run calibration first
+        calibration = CalibrationScreen(self.screen, self.hand_tracker, self.cap)
+        calibration_data = calibration.run()
+        
+        # Apply calibration to hand tracker
+        self.hand_tracker.set_calibration(calibration_data)
+        
+        # Run the game with calibration data
+        game = game_class(self.screen, self.hand_tracker, self.cap, calibration_data)
         session_data = game.run()
         self.data_manager.save_session(game_name, session_data)
 
     def _show_dashboard(self):
-        """Displays the dashboard with data from past sessions."""
+        """Displays the dashboard with data from past sessions and allows per-game progress viewing."""
         sessions = self.data_manager.load_all_sessions()
         self.screen.fill(self.white)
         self._draw_text('Dashboard', self.font, self.black, self.screen, self.screen.get_width() / 2, 50)
 
-        if not sessions:
-            self._draw_text("No data available yet.", self.small_font, self.black, self.screen, self.screen.get_width() / 2, 300)
-        else:
-            y_pos = 120
-            for session in sessions[:15]: # Show last 15 sessions
-                game_name = session.get('metadata', {}).get('game_name', 'N/A')
-                timestamp_str = session.get('metadata', {}).get('session_start_time', 'N/A')
-                
-                try:
-                    timestamp = datetime.fromisoformat(timestamp_str).strftime('%Y-%m-%d %H:%M')
-                except (ValueError, TypeError):
-                    timestamp = "Invalid Date"
+        # --- Group sessions by game ---
+        game_sessions = {}
+        for session in sessions:
+            game_name = session.get('metadata', {}).get('game_name', 'Unknown')
+            if game_name not in game_sessions:
+                game_sessions[game_name] = []
+            game_sessions[game_name].append(session)
 
-                metrics = session.get('metrics', {})
-                score = metrics.get('score', 'N/A')
-                
-                display_text = f"{timestamp} - {game_name} - Score: {score}"
-                self._draw_text(display_text, self.small_font, self.black, self.screen, self.screen.get_width() / 2, y_pos)
-                y_pos += 30
+        # --- Game selection menu ---
+        games = list(game_sessions.keys())
+        button_rects = []
+        y_pos = 120
+        for game in games:
+            rect = pygame.Rect(self.screen.get_width() // 2 - 200, y_pos, 400, 50)
+            button_rects.append((rect, game))
+            pygame.draw.rect(self.screen, self.gray, rect)
+            self._draw_text(game, self.small_font, self.black, self.screen, self.screen.get_width() // 2, y_pos + 25)
+            y_pos += 70
 
-        self._draw_text("Click anywhere to return to menu", self.small_font, self.gray, self.screen, self.screen.get_width() / 2, self.screen.get_height() - 50)
+        self._draw_text("Click a game to view progress", self.small_font, self.gray, self.screen, self.screen.get_width() // 2, y_pos + 20)
         pygame.display.flip()
 
+        # --- Wait for game selection ---
+        selected_game = None
+        while selected_game is None:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    for rect, game in button_rects:
+                        if rect.collidepoint(event.pos):
+                            selected_game = game
+            pygame.time.wait(10)
+
+        # --- Show progress chart for selected game ---
+        self._show_game_progress_chart(game_sessions[selected_game], selected_game)
+
+    def _show_game_progress_chart(self, sessions, game_name):
+        """Displays a progress chart for a specific game with hover tooltips."""
+        # --- Prepare data ---
+        from collections import defaultdict
+        import datetime
+
+        date_sessions = defaultdict(list)
+        for session in sessions:
+            ts = session.get('metadata', {}).get('session_start_time', None)
+            if ts:
+                try:
+                    date = datetime.datetime.fromisoformat(ts).date()
+                except Exception:
+                    date = "Unknown"
+            else:
+                date = "Unknown"
+            date_sessions[date].append(session)
+
+        # For each date, get max score, min/max pinch distance, max speed, etc.
+        chart_data = []
+        for date in sorted(date_sessions.keys()):
+            day_sessions = date_sessions[date]
+            max_score = max([s.get('metrics', {}).get('score', 0) for s in day_sessions])
+            
+            # Get min and max pinch distances
+            all_min_pinch = [s.get('metrics', {}).get('min_pinch_distance', 0) for s in day_sessions]
+            all_max_pinch = [s.get('metrics', {}).get('max_pinch_distance', 0) for s in day_sessions]
+            min_pinch_distance = min([d for d in all_min_pinch if d > 0]) if any(d > 0 for d in all_min_pinch) else 0
+            max_pinch_distance = max(all_max_pinch) if all_max_pinch else 0
+            
+            # Get max speed
+            max_speed = max([s.get('metrics', {}).get('max_speed', 0) for s in day_sessions])
+            
+            chart_data.append({
+                "date": date,
+                "score": max_score,
+                "min_pinch_distance": round(min_pinch_distance, 2),
+                "max_pinch_distance": round(max_pinch_distance, 2),
+                "max_speed": round(max_speed, 2),
+                "sessions": day_sessions
+            })
+
+        # --- Draw chart ---
+        running = True
+        hover_index = None
+        while running:
+            self.screen.fill(self.white)
+            self._draw_text(f"{game_name} Progress", self.font, self.black, self.screen, self.screen.get_width() // 2, 50)
+            
+            # Back button
+            self._draw_text("Back", self.small_font, self.red, self.screen, 80, 40)
+            back_rect = pygame.Rect(30, 20, 100, 40)
+            
+            # Clear Data button
+            self._draw_text("Clear Data", self.small_font, self.red, self.screen, self.screen.get_width() - 100, 40)
+            clear_rect = pygame.Rect(self.screen.get_width() - 170, 20, 150, 40)
+
+            # Chart area
+            chart_x = 120
+            chart_y = 120
+            chart_w = self.screen.get_width() - 200
+            chart_h = 350
+
+            # Draw axes
+            pygame.draw.line(self.screen, self.black, (chart_x, chart_y), (chart_x, chart_y + chart_h), 2)
+            pygame.draw.line(self.screen, self.black, (chart_x, chart_y + chart_h), (chart_x + chart_w, chart_y + chart_h), 2)
+
+            # Draw bars for scores
+            if chart_data:
+                max_score = max([d["score"] for d in chart_data]) or 1
+                bar_w = max(30, min(60, chart_w // max(1, len(chart_data))))
+                spacing = bar_w + 10
+                for i, d in enumerate(chart_data):
+                    bar_height = int((d["score"] / max_score) * (chart_h - 40))
+                    bar_rect = pygame.Rect(chart_x + i * spacing, chart_y + chart_h - bar_height, bar_w, bar_height)
+                    color = (100, 180, 255) if i != hover_index else (255, 180, 100)
+                    pygame.draw.rect(self.screen, color, bar_rect)
+                    # Date label
+                    date_str = str(d["date"])[5:] if d["date"] != "Unknown" else "?"
+                    date_label = self.small_font.render(date_str, True, self.black)
+                    self.screen.blit(date_label, (bar_rect.centerx - date_label.get_width() // 2, chart_y + chart_h + 5))
+                    # Hover detection
+                    mouse_pos = pygame.mouse.get_pos()
+                    if bar_rect.collidepoint(mouse_pos):
+                        hover_index = i
+                    elif hover_index == i and not bar_rect.collidepoint(mouse_pos):
+                        hover_index = None
+
+            # --- Hover tooltip ---
+            if hover_index is not None and hover_index < len(chart_data):
+                d = chart_data[hover_index]
+                tooltip_lines = [
+                    f"Date: {d['date']}",
+                    f"Score: {d['score']}",
+                    f"Min Pinch: {d['min_pinch_distance']}px",
+                    f"Max Pinch: {d['max_pinch_distance']}px",
+                    f"Max Speed: {d['max_speed']}"
+                ]
+                tooltip_w = max(self.small_font.size(line)[0] for line in tooltip_lines) + 20
+                tooltip_h = 25 * len(tooltip_lines) + 10
+                mx, my = pygame.mouse.get_pos()
+                tooltip_rect = pygame.Rect(mx + 10, my - tooltip_h, tooltip_w, tooltip_h)
+                pygame.draw.rect(self.screen, (240, 240, 200), tooltip_rect)
+                pygame.draw.rect(self.screen, self.black, tooltip_rect, 2)
+                for idx, line in enumerate(tooltip_lines):
+                    text = self.small_font.render(line, True, self.black)
+                    self.screen.blit(text, (tooltip_rect.x + 10, tooltip_rect.y + 5 + idx * 25))
+
+            pygame.display.flip()
+
+            # --- Event handling ---
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if back_rect.collidepoint(event.pos):
+                        running = False
+                    elif clear_rect.collidepoint(event.pos):
+                        # Confirm and clear data
+                        if self._confirm_clear_data(game_name):
+                            self.data_manager.clear_game_data(game_name)
+                            running = False
+
+            pygame.time.wait(20)
+
+    def _confirm_clear_data(self, game_name):
+        """Shows a confirmation dialog for clearing data."""
+        overlay = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
+        
+        confirm_text = self.font.render(f"Clear all data for {game_name}?", True, self.white)
+        yes_text = self.small_font.render("Yes", True, self.white)
+        no_text = self.small_font.render("No", True, self.white)
+        
+        self.screen.blit(confirm_text, (self.screen.get_width() // 2 - confirm_text.get_width() // 2, 250))
+        
+        yes_rect = pygame.Rect(self.screen.get_width() // 2 - 120, 350, 100, 50)
+        no_rect = pygame.Rect(self.screen.get_width() // 2 + 20, 350, 100, 50)
+        
+        pygame.draw.rect(self.screen, self.red, yes_rect)
+        pygame.draw.rect(self.screen, self.gray, no_rect)
+        
+        self.screen.blit(yes_text, (yes_rect.centerx - yes_text.get_width() // 2, yes_rect.centery - yes_text.get_height() // 2))
+        self.screen.blit(no_text, (no_rect.centerx - no_text.get_width() // 2, no_rect.centery - no_text.get_height() // 2))
+        
+        pygame.display.flip()
+        
         waiting = True
+        result = False
         while waiting:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                if event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
-                    waiting = False
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if yes_rect.collidepoint(event.pos):
+                        result = True
+                        waiting = False
+                    elif no_rect.collidepoint(event.pos):
+                        result = False
+                        waiting = False
+        
+        return result
 
     def run(self):
         """The main application loop."""

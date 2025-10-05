@@ -57,4 +57,23 @@ class DataManager:
                         print(f"Warning: Could not decode or parse JSON from {filename}. Error: {e}")
         return all_sessions
 
+    def clear_game_data(self, game_name):
+        """
+        Clears all session data for a specific game.
+        :param game_name: The name of the game whose data should be cleared.
+        """
+        if not os.path.exists(self.data_folder):
+            return
+        
+        files = [f for f in os.listdir(self.data_folder) if f.endswith('.json')]
+        for filename in files:
+            filepath = os.path.join(self.data_folder, filename)
+            try:
+                with open(filepath, 'r') as f:
+                    session = json.load(f)
+                if session.get('metadata', {}).get('game_name') == game_name:
+                    os.remove(filepath)
+            except Exception as e:
+                print(f"Error clearing {filename}: {e}")
+
 

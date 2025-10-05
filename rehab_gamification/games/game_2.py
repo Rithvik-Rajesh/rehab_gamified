@@ -6,17 +6,15 @@ from rehab_gamification.hand_tracking.hand_tracker import HandTracker
 from rehab_gamification.games.base_game import BaseGame
 
 class FingerPainterGame(BaseGame):
-    """
-    A game where the player uses their index finger to 'paint' over targets.
-    """
-    def __init__(self, screen, hand_tracker, cap):
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
         """
         Initializes the FingerPainterGame.
         :param screen: The pygame screen to draw on.
         :param hand_tracker: The shared HandTracker instance.
         :param cap: The shared camera capture instance.
+        :param calibration_data: Calibration parameters.
         """
-        super().__init__(screen, hand_tracker, cap)
+        super().__init__(screen, hand_tracker, cap, calibration_data)
         self.screen_width, self.screen_height = screen.get_size()
 
         # Colors and Fonts
@@ -45,6 +43,14 @@ class FingerPainterGame(BaseGame):
         self.timer = 15  # 15-second timer
         self.last_tick = pygame.time.get_ticks()
         self.font = pygame.font.Font(None, 50)
+        
+        # Tracking metrics
+        self.max_speed = 0
+        self.last_hand_pos = None
+        self.hand_speeds = []
+        self.min_pinch_distance = float('inf')
+        self.max_pinch_distance = 0
+        self.pinch_distances = []
 
         self._create_targets(5)
 
@@ -90,6 +96,28 @@ class FingerPainterGame(BaseGame):
 
             processed_frame = self.display_camera_feed(frame, draw=False)
             lm_list = self.hand_tracker.get_landmark_positions(processed_frame, draw=False)
+            is_pinching, pinch_pos = self.hand_tracker.get_pinch_gesture(
+                lm_list,
+                pinch_threshold=self.calibration_data.get("pinch_threshold", 40)
+            )
+            
+            hand_pos = self.hand_tracker.get_hand_position(lm_list)
+            
+            # Calculate hand speed
+            if self.last_hand_pos and hand_pos != (0, 0):
+                speed = ((hand_pos[0] - self.last_hand_pos[0])**2 + (hand_pos[1] - self.last_hand_pos[1])**2)**0.5
+                self.hand_speeds.append(speed)
+                self.max_speed = max(self.max_speed, speed)
+            self.last_hand_pos = hand_pos
+            
+            # Calculate pinch distance
+            if len(lm_list) >= 9:
+                thumb_tip = lm_list[4]
+                index_tip = lm_list[8]
+                pinch_distance = self.hand_tracker.calculate_distance(thumb_tip, index_tip)
+                self.pinch_distances.append(pinch_distance)
+                self.min_pinch_distance = min(self.min_pinch_distance, pinch_distance)
+                self.max_pinch_distance = max(self.max_pinch_distance, pinch_distance)
 
             if lm_list:
                 # Use index finger tip (landmark 8)
@@ -130,7 +158,18 @@ class FingerPainterGame(BaseGame):
 
         # Show game over screen before returning
         self.show_game_over_screen()
-        return {"time_left": 0}
+        # Return session data (can be expanded later)
+        avg_speed = sum(self.hand_speeds) / len(self.hand_speeds) if self.hand_speeds else 0
+        avg_pinch_distance = sum(self.pinch_distances) / len(self.pinch_distances) if self.pinch_distances else 0
+        return {
+            "time_left": 0,
+            "max_speed": round(self.max_speed, 2),
+            "avg_speed": round(avg_speed, 2),
+            "min_pinch_distance": round(self.min_pinch_distance, 2) if self.min_pinch_distance != float('inf') else 0,
+            "max_pinch_distance": round(self.max_pinch_distance, 2),
+            "avg_pinch_distance": round(avg_pinch_distance, 2),
+            "score": 0  # Could track number of strokes or coverage
+        }
 
 if __name__ == '__main__':
     # This part is for testing the game directly

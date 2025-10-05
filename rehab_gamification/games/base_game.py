@@ -9,13 +9,14 @@ class BaseGame:
     """
     A base class for games to handle camera feed and hand tracking.
     """
-    def __init__(self, screen, hand_tracker, cap):
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
         self.screen = screen
         self.screen_width, self.screen_height = self.screen.get_size()
         self.clock = pygame.time.Clock()
         self.game_over = False
         self.hand_tracker = hand_tracker
         self.cap = cap
+        self.calibration_data = calibration_data or {"pinch_threshold": 40, "sensitivity": 1.0}
         if not self.cap.isOpened():
             raise IOError("Cannot open webcam")
 
