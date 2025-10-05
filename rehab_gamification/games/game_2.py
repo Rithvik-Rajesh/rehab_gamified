@@ -3,13 +3,20 @@ import random
 import cv2
 import sys
 from rehab_gamification.hand_tracking.hand_tracker import HandTracker
+from rehab_gamification.games.base_game import BaseGame
 
-class FingerPainterGame:
+class FingerPainterGame(BaseGame):
     """
     A game where the player uses their index finger to 'paint' over targets.
     """
-    def __init__(self, screen):
-        self.screen = screen
+    def __init__(self, screen, hand_tracker, cap):
+        """
+        Initializes the FingerPainterGame.
+        :param screen: The pygame screen to draw on.
+        :param hand_tracker: The shared HandTracker instance.
+        :param cap: The shared camera capture instance.
+        """
+        super().__init__(screen, hand_tracker, cap)
         self.screen_width, self.screen_height = screen.get_size()
 
         # Colors and Fonts
@@ -26,15 +33,18 @@ class FingerPainterGame:
         self.targets = []
         self.cursor_pos = (0, 0)
         self.start_time = pygame.time.get_ticks()
-        self.time_limit = 30000  # 30 seconds
-
-        # Hand tracking
-        self.hand_tracker = HandTracker()
-        self.cap = cv2.VideoCapture(0)
+        self.time_limit = 15000  # 15 seconds
 
         # Data recording
         self.targets_hit = 0
         self.total_targets = 0
+
+        # Drawing state
+        self.is_drawing = False
+        self.last_pos = None
+        self.timer = 15  # 15-second timer
+        self.last_tick = pygame.time.get_ticks()
+        self.font = pygame.font.Font(None, 50)
 
         self._create_targets(5)
 
@@ -53,8 +63,19 @@ class FingerPainterGame:
     def run(self):
         """The main game loop."""
         clock = pygame.time.Clock()
+        draw_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
 
         while not self.game_over:
+            # --- Timer Logic ---
+            if self.timer > 0:
+                if pygame.time.get_ticks() - self.last_tick >= 1000:
+                    self.timer -= 1
+                    self.last_tick = pygame.time.get_ticks()
+            else:
+                self.game_over = True
+                continue
+
+            # --- Event Handling ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.game_over = True
@@ -62,19 +83,13 @@ class FingerPainterGame:
                     if event.key == pygame.K_ESCAPE:
                         self.game_over = True
 
-            # Time limit check
-            elapsed_time = pygame.time.get_ticks() - self.start_time
-            if elapsed_time >= self.time_limit:
-                self.game_over = True
-
             # Hand tracking
             success, frame = self.cap.read()
             if not success:
                 continue
 
-            frame = cv2.flip(frame, 1)
-            frame = self.hand_tracker.find_hands(frame, draw=False)
-            lm_list = self.hand_tracker.get_landmark_positions(frame, draw=False)
+            processed_frame = self.display_camera_feed(frame, draw=False)
+            lm_list = self.hand_tracker.get_landmark_positions(processed_frame, draw=False)
 
             if lm_list:
                 # Use index finger tip (landmark 8)
@@ -105,7 +120,7 @@ class FingerPainterGame:
 
             # Draw UI
             score_text = self.font.render(f"Score: {self.score}", True, self.black)
-            time_left = (self.time_limit - elapsed_time) // 1000
+            time_left = (self.time_limit - (pygame.time.get_ticks() - self.start_time)) // 1000
             time_text = self.font.render(f"Time: {time_left}", True, self.black)
             self.screen.blit(score_text, (10, 10))
             self.screen.blit(time_text, (self.screen_width - 150, 10))
@@ -113,18 +128,9 @@ class FingerPainterGame:
             pygame.display.flip()
             clock.tick(60)
 
-        self.cap.release()
-        return self.get_session_data()
-
-    def get_session_data(self):
-        """Returns the recorded data for the session."""
-        accuracy = (self.targets_hit / self.total_targets) * 100 if self.total_targets > 0 else 0
-        return {
-            "score": self.score,
-            "targets_hit": self.targets_hit,
-            "total_targets": self.total_targets,
-            "accuracy": round(accuracy, 2)
-        }
+        # Show game over screen before returning
+        self.show_game_over_screen()
+        return {"time_left": 0}
 
 if __name__ == '__main__':
     # This part is for testing the game directly
@@ -132,7 +138,11 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((800, 600))
     pygame.display.set_caption("Finger Painter Test")
     
-    game = FingerPainterGame(screen)
+    # Initialize HandTracker and camera here for testing
+    hand_tracker = HandTracker()
+    cap = cv2.VideoCapture(0)
+    
+    game = FingerPainterGame(screen, hand_tracker, cap)
     session_data = game.run()
     
     print("Game Over!")

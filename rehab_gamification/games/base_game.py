@@ -9,13 +9,13 @@ class BaseGame:
     """
     A base class for games to handle camera feed and hand tracking.
     """
-    def __init__(self, screen):
+    def __init__(self, screen, hand_tracker, cap):
         self.screen = screen
         self.screen_width, self.screen_height = self.screen.get_size()
         self.clock = pygame.time.Clock()
         self.game_over = False
-        self.hand_tracker = HandTracker()
-        self.cap = cv2.VideoCapture(0)
+        self.hand_tracker = hand_tracker
+        self.cap = cap
         if not self.cap.isOpened():
             raise IOError("Cannot open webcam")
 
@@ -48,11 +48,50 @@ class BaseGame:
         # for landmark position calculation.
         return frame_with_hands
 
+    def show_game_over_screen(self):
+        """Displays a 'Game Over' screen and waits for input to exit."""
+        darken_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        darken_surface.fill((0, 0, 0, 150))
+        self.screen.blit(darken_surface, (0, 0))
+
+        font = pygame.font.Font(None, 74)
+        small_font = pygame.font.Font(None, 40)
+        game_over_text = font.render("Game Over", True, (255, 255, 255))
+        exit_text = small_font.render("Pinch to Exit", True, (255, 255, 255))
+
+        game_over_rect = game_over_text.get_rect(center=(self.screen_width / 2, self.screen_height / 2 - 50))
+        exit_rect = exit_text.get_rect(center=(self.screen_width / 2, self.screen_height / 2 + 50))
+
+        self.screen.blit(game_over_text, game_over_rect)
+        self.screen.blit(exit_text, exit_rect)
+        pygame.display.flip()
+
+        waiting = True
+        was_pinching = True 
+        while waiting:
+            success, frame = self.cap.read()
+            if success:
+                frame = cv2.flip(frame, 1)
+                lm_list = self.hand_tracker.get_landmark_positions(self.hand_tracker.find_hands(frame, draw=False), draw=False)
+                is_pinching, _ = self.hand_tracker.get_pinch_gesture(lm_list)
+                if is_pinching and not was_pinching:
+                    waiting = False
+                was_pinching = is_pinching
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    self.game_over = True # Ensure main loop also exits
+                if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                    waiting = False
+            
+            self.clock.tick(20)
+
     def run(self):
         # This method should be implemented by child game classes
         raise NotImplementedError
 
     def __del__(self):
         """Release the camera when the game object is destroyed."""
-        if self.cap.isOpened():
-            self.cap.release()
+        # Camera is now managed by MainApp, so we don't release it here.
+        pass

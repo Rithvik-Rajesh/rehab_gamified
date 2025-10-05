@@ -5,6 +5,8 @@ from rehab_gamification.games.balloon_pop import BalloonPopGame
 from rehab_gamification.games.game_2 import FingerPainterGame
 from rehab_gamification.games.maze_game import MazeGame
 from rehab_gamification.data_manager import DataManager
+import cv2
+from rehab_gamification.hand_tracking.hand_tracker import HandTracker
 
 class MainApp:
     """
@@ -24,11 +26,17 @@ class MainApp:
         self.white = (255, 255, 255)
         self.black = (0, 0, 0)
         self.gray = (200, 200, 200)
+        self.red = (255, 0, 0)
+        self.blue = (0, 0, 255)
         self.font = pygame.font.Font(None, 50)
         self.small_font = pygame.font.Font(None, 30)
 
         # Data Manager
         self.data_manager = DataManager(data_folder='rehab_gamification/data')
+
+        # Centralized Hand Tracking and Camera
+        self.hand_tracker = HandTracker()
+        self.cap = cv2.VideoCapture(0)
 
         # Menu options
         self.menu_options = ["Balloon Pop", "Finger Painter", "Maze Game", "Dashboard", "Quit"]
@@ -41,34 +49,77 @@ class MainApp:
         surface.blit(textobj, textrect)
 
     def _main_menu(self):
-        """Displays the main menu and handles user input."""
-        self.buttons.clear()
-        self.screen.fill(self.white)
-        self._draw_text('Main Menu', self.font, self.black, self.screen, self.screen.get_width() / 2, 100)
-
-        y_pos = 200
-        for option in self.menu_options:
-            button_rect = pygame.Rect(self.screen.get_width() / 2 - 150, y_pos, 300, 50)
-            self.buttons.append(button_rect)
-            pygame.draw.rect(self.screen, self.gray, button_rect)
-            self._draw_text(option, self.small_font, self.black, self.screen, self.screen.get_width() / 2, y_pos + 25)
-            y_pos += 70
-
-        pygame.display.flip()
+        """Displays the main menu and handles user input with hand tracking."""
+        was_pinching = False
+        cam_w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        cam_h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
         while True:
+            # --- Camera and Hand Tracking ---
+            success, frame = self.cap.read()
+            if not success:
+                continue
+
+            frame = cv2.flip(frame, 1)
+            frame_with_hands = self.hand_tracker.find_hands(frame, draw=True)
+            frame_rgb = cv2.cvtColor(frame_with_hands, cv2.COLOR_BGR2RGB)
+            frame_pygame = pygame.surfarray.make_surface(frame_rgb.transpose((1, 0, 2)))
+            self.screen.blit(frame_pygame, (0, 0))
+
+            lm_list = self.hand_tracker.get_landmark_positions(frame_with_hands, draw=False)
+            is_pinching, _ = self.hand_tracker.get_pinch_gesture(lm_list)
+            hand_pos = self.hand_tracker.get_hand_position(lm_list)
+
+            cursor_pos = (0, 0)
+            if cam_w > 0 and cam_h > 0:
+                cursor_x = int(hand_pos[0] * self.screen.get_width() / cam_w)
+                cursor_y = int(hand_pos[1] * self.screen.get_height() / cam_h)
+                cursor_pos = (self.screen.get_width() - cursor_x, cursor_y)
+
+            # --- Menu Drawing ---
+            self.buttons.clear()
+            self._draw_text('Main Menu', self.font, self.white, self.screen, self.screen.get_width() / 2, 100)
+
+            y_pos = 200
+            for option in self.menu_options:
+                button_rect = pygame.Rect(self.screen.get_width() / 2 - 150, y_pos, 300, 50)
+                self.buttons.append(button_rect)
+                
+                color = self.blue if button_rect.collidepoint(cursor_pos) else self.gray
+                pygame.draw.rect(self.screen, color, button_rect)
+                self._draw_text(option, self.small_font, self.black, self.screen, self.screen.get_width() / 2, y_pos + 25)
+                y_pos += 70
+
+            # --- Input Handling ---
+            click = False
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    self.cap.release()
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    for i, button in enumerate(self.buttons):
-                        if button.collidepoint(event.pos):
-                            return self.menu_options[i]
+                    click = True
+                    cursor_pos = event.pos
+
+            if is_pinching and not was_pinching:
+                click = True
+            was_pinching = is_pinching
+
+            if click:
+                for i, button in enumerate(self.buttons):
+                    if button.collidepoint(cursor_pos):
+                        return self.menu_options[i]
+
+            # --- Draw Cursor ---
+            cursor_color = self.red if is_pinching else self.blue
+            pygame.draw.circle(self.screen, cursor_color, cursor_pos, 15)
+            pygame.draw.circle(self.screen, self.white, cursor_pos, 15, 2)
+
+            pygame.display.flip()
 
     def _run_game(self, game_class, game_name):
         """Runs a game, and saves the session data."""
-        game = game_class(self.screen)
+        game = game_class(self.screen, self.hand_tracker, self.cap)
         session_data = game.run()
         self.data_manager.save_session(game_name, session_data)
 
@@ -124,6 +175,7 @@ class MainApp:
             elif choice == "Dashboard":
                 self._show_dashboard()
             elif choice == "Quit":
+                self.cap.release()
                 pygame.quit()
                 sys.exit()
 

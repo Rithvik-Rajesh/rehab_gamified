@@ -38,8 +38,8 @@ class Balloon:
 
 # --- BalloonPopGame Class ---
 class BalloonPopGame(BaseGame):
-    def __init__(self, screen):
-        super().__init__(screen)
+    def __init__(self, screen, hand_tracker, cap):
+        super().__init__(screen, hand_tracker, cap)
         self.balloons = []
         self.score = 0
         self.font = pygame.font.Font(None, 50)

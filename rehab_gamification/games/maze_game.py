@@ -1,9 +1,8 @@
 import pygame
-import sys
+from rehab_gamification.games.base_game import BaseGame
 import cv2
 import numpy as np
 from datetime import datetime
-from rehab_gamification.hand_tracking.hand_tracker import HandTracker
 
 # --- Game Configuration ---
 SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
@@ -40,14 +39,20 @@ MAZE_LAYOUTS = {
     ],
 }
 
-class MazeGame:
-    def __init__(self, screen):
-        self.screen = screen
+class MazeGame(BaseGame):
+    """
+    A game where the player navigates a maze with their hand.
+    """
+    def __init__(self, screen, hand_tracker, cap):
+        """
+        Initializes the MazeGame.
+        :param screen: The pygame screen to draw on.
+        :param hand_tracker: The shared HandTracker instance.
+        :param cap: The shared camera capture instance.
+        """
+        super().__init__(screen, hand_tracker, cap)
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
-        
-        self.hand_tracker = HandTracker()
-        self.cap = cv2.VideoCapture(0)
 
         self.game_active = False
         self.game_won = False
