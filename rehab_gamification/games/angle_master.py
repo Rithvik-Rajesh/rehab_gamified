@@ -1,3 +1,4 @@
+# This game is included in the app
 import pygame
 import random
 import cv2
