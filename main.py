@@ -4,6 +4,7 @@ from datetime import datetime
 from rehab_gamification.games.balloon_pop import BalloonPopGame
 from rehab_gamification.games.game_2 import FingerPainterGame
 from rehab_gamification.games.maze_game import MazeGame
+from rehab_gamification.games.dino_game import DinoGame
 from rehab_gamification.data_manager import DataManager
 from rehab_gamification.calibration import CalibrationScreen
 import cv2
@@ -40,7 +41,7 @@ class MainApp:
         self.cap = cv2.VideoCapture(0)
 
         # Menu options
-        self.menu_options = ["Balloon Pop", "Finger Painter", "Maze Game", "Dashboard", "Quit"]
+        self.menu_options = ["Balloon Pop", "Finger Painter", "Maze Game","Dino Game", "Dashboard", "Quit"]
         self.buttons = []
 
     def _draw_text(self, text, font, color, surface, x, y):
@@ -353,6 +354,8 @@ class MainApp:
                 self._run_game(FingerPainterGame, "FingerPainter")
             elif choice == "Maze Game":
                 self._run_game(MazeGame, "MazeGame")
+            elif choice == "Dino Game":
+                self._run_game(DinoGame, "DinoGame")
             elif choice == "Dashboard":
                 self._show_dashboard()
             elif choice == "Quit":

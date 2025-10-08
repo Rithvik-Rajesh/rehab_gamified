@@ -1,0 +1,16 @@
+{
+    "metadata": {
+        "game_name": "FingerPainter",
+        "session_start_time": "2025-10-08T06:55:35.966694",
+        "version": "1.0"
+    },
+    "metrics": {
+        "time_left": 0,
+        "max_speed": 1629.73,
+        "avg_speed": 42.79,
+        "min_pinch_distance": 9.85,
+        "max_pinch_distance": 450.7,
+        "avg_pinch_distance": 175.04,
+        "score": 0
+    }
+}
