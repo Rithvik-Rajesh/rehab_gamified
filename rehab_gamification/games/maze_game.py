@@ -1,9 +1,8 @@
 import pygame
-import sys
+from rehab_gamification.games.base_game import BaseGame
 import cv2
 import numpy as np
 from datetime import datetime
-from rehab_gamification.hand_tracking.hand_tracker import HandTracker
 
 # --- Game Configuration ---
 SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
@@ -40,14 +39,21 @@ MAZE_LAYOUTS = {
     ],
 }
 
-class MazeGame:
-    def __init__(self, screen):
-        self.screen = screen
+class MazeGame(BaseGame):
+    """
+    A game where the player navigates a maze with their hand.
+    """
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
+        """
+        Initializes the MazeGame.
+        :param screen: The pygame screen to draw on.
+        :param hand_tracker: The shared HandTracker instance.
+        :param cap: The shared camera capture instance.
+        :param calibration_data: Calibration parameters.
+        """
+        super().__init__(screen, hand_tracker, cap, calibration_data)
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
-        
-        self.hand_tracker = HandTracker()
-        self.cap = cv2.VideoCapture(0)
 
         self.game_active = False
         self.game_won = False
@@ -192,12 +198,20 @@ class MazeGame:
             current_player_color = PLAYER_COLOR
 
             if not self.game_won:
+                successful_movement = True
                 for wall_rect in self.maze_rects:
                     if player_rect.colliderect(wall_rect):
                         if self.game_active:
                             self.wall_touches += 1
                             current_player_color = COLLISION_COLOR
+                            successful_movement = False
                         break
+                
+                # Track hand movement effectiveness in maze navigation
+                if lm_list and self.game_active:
+                    # For maze game, successful interaction is moving without hitting walls
+                    if successful_movement:
+                        self.hand_movement_data["successful_interactions"] += 1
                 
                 start_cell_rect = pygame.Rect(
                     self.maze_offset_x + self.start_cell_pos[0] * self.cell_width,
@@ -243,9 +257,21 @@ class MazeGame:
         return self.get_session_data()
 
     def get_session_data(self):
+        # Get enhanced session data from base class
+        enhanced_data = self.get_enhanced_session_data()
+        
         elapsed_time = (self.end_time - self.start_time).total_seconds() if self.game_won and self.start_time else 0
-        return {
+        
+        # Add maze-specific game metrics
+        maze_specific_data = {
             "time_taken": round(elapsed_time, 2),
             "wall_touches": self.wall_touches,
-            "completed": self.game_won
+            "completed": self.game_won,
+            "navigation_accuracy": round((1 - (self.wall_touches / max(1, self.hand_movement_data["total_movements"]))) * 100, 2)
         }
+        
+        # Merge enhanced data with game-specific data
+        enhanced_data["game_specific_metrics"] = maze_specific_data
+        enhanced_data["game_name"] = "MazeGame"
+        
+        return enhanced_data

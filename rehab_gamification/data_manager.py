@@ -50,11 +50,57 @@ class DataManager:
                 with open(filepath, 'r') as f:
                     try:
                         data = json.load(f)
-                        # Add filename for reference, can be useful for deletion or updates
-                        data['metadata']['filename'] = filename
+                        
+                        # Handle both old and new data structures
+                        if 'metadata' in data:
+                            # Old format
+                            data['metadata']['filename'] = filename
+                        elif 'session_metadata' in data:
+                            # New enhanced format - create backward compatibility
+                            if 'metadata' not in data:
+                                data['metadata'] = {
+                                    'game_name': data['session_metadata'].get('game_name', 'Unknown'),
+                                    'session_start_time': data['session_metadata'].get('start_time', ''),
+                                    'filename': filename
+                                }
+                        else:
+                            # Fallback for very old formats
+                            data['metadata'] = {
+                                'game_name': 'Unknown',
+                                'session_start_time': '',
+                                'filename': filename
+                            }
+                        
                         all_sessions.append(data)
                     except (json.JSONDecodeError, KeyError) as e:
                         print(f"Warning: Could not decode or parse JSON from {filename}. Error: {e}")
         return all_sessions
+
+    def clear_game_data(self, game_name):
+        """
+        Clears all session data for a specific game.
+        :param game_name: The name of the game whose data should be cleared.
+        """
+        if not os.path.exists(self.data_folder):
+            return
+        
+        files = [f for f in os.listdir(self.data_folder) if f.endswith('.json')]
+        for filename in files:
+            filepath = os.path.join(self.data_folder, filename)
+            try:
+                with open(filepath, 'r') as f:
+                    session = json.load(f)
+                
+                # Handle both old and new data structures
+                game_name_in_session = None
+                if 'metadata' in session:
+                    game_name_in_session = session['metadata'].get('game_name')
+                elif 'session_metadata' in session:
+                    game_name_in_session = session['session_metadata'].get('game_name')
+                
+                if game_name_in_session == game_name:
+                    os.remove(filepath)
+            except Exception as e:
+                print(f"Error clearing {filename}: {e}")
 
 

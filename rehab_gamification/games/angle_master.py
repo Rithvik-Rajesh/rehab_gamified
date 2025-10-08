@@ -2,18 +2,16 @@
 import pygame
 import random
 import cv2
-from rehab_gamification.hand_tracking.hand_tracker import HandTracker
+from rehab_gamification.games.base_game import BaseGame
 
-class AngleMasterGame:
-    """
-    A game where the player tries to match a target finger angle.
-    """
-    def __init__(self, screen):
+class AngleMasterGame(BaseGame):
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
         """
         Initializes the AngleMasterGame.
         :param screen: The pygame screen to draw on.
+        :param calibration_data: Calibration parameters.
         """
-        self.screen = screen
+        super().__init__(screen, hand_tracker, cap, calibration_data)
         self.screen_width, self.screen_height = screen.get_size()
 
         # Colors
@@ -30,25 +28,23 @@ class AngleMasterGame:
         self.hold_time = 0
         self.hold_duration_goal = 120  # 2 seconds at 60 FPS
 
-        # Hand tracking
-        self.cap = cv2.VideoCapture(0)
-        self.hand_tracker = HandTracker()
-
         # UI
         self.font = pygame.font.Font(None, 48)
         self.feedback_text = ""
 
-        # Game state
-        self.game_over = False
-
         # Data recording
         self.achieved_angles = []
         self.target_angles = []
+        self.max_angle = 0
+        self.max_speed = 0
+        self.last_hand_pos = None
+        self.hand_speeds = []
+        self.min_pinch_distance = float('inf')
+        self.max_pinch_distance = 0
+        self.pinch_distances = []
 
     def run(self):
         """The main game loop."""
-        clock = pygame.time.Clock()
-
         while not self.game_over:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -61,16 +57,33 @@ class AngleMasterGame:
             success, frame = self.cap.read()
             if not success:
                 continue
+            
+            processed_frame = self.display_camera_feed(frame, draw=True)
+            lm_list = self.hand_tracker.get_landmark_positions(processed_frame, draw=False)
 
-            frame = self.hand_tracker.find_hands(frame, draw=False)
-            lm_list = self.hand_tracker.get_landmark_positions(frame, draw=False)
+            # Calculate hand speed
+            hand_pos = self.hand_tracker.get_hand_position(lm_list)
+            if self.last_hand_pos and hand_pos != (0, 0):
+                speed = ((hand_pos[0] - self.last_hand_pos[0])**2 + (hand_pos[1] - self.last_hand_pos[1])**2)**0.5
+                self.hand_speeds.append(speed)
+                self.max_speed = max(self.max_speed, speed)
+            self.last_hand_pos = hand_pos
 
             if len(lm_list) != 0:
+                # Calculate pinch distance
+                thumb_tip = lm_list[4]
+                index_tip = lm_list[8]
+                pinch_distance = self.hand_tracker.calculate_distance(thumb_tip, index_tip)
+                self.pinch_distances.append(pinch_distance)
+                self.min_pinch_distance = min(self.min_pinch_distance, pinch_distance)
+                self.max_pinch_distance = max(self.max_pinch_distance, pinch_distance)
+                
                 # Using index finger landmarks 5, 6, 7 for angle calculation
                 p1 = lm_list[5]
                 p2 = lm_list[6]
                 p3 = lm_list[7]
                 self.current_angle = self.hand_tracker.calculate_angle(p1, p2, p3)
+                self.max_angle = max(self.max_angle, self.current_angle)
 
                 # Game logic
                 angle_difference = abs(self.target_angle - self.current_angle)
@@ -92,13 +105,10 @@ class AngleMasterGame:
             else:
                 self.feedback_text = "Show your hand"
 
-            # Drawing
-            self.screen.fill(self.white)
-
-            # UI Text
-            target_text = self.font.render(f"Target Angle: {int(self.target_angle)}", True, self.black)
+            # Drawing UI Text
+            target_text = self.font.render(f"Target Angle: {int(self.target_angle)}", True, self.white)
             your_text = self.font.render(f"Your Angle: {int(self.current_angle)}", True, self.blue)
-            score_text = self.font.render(f"Score: {self.score}", True, self.black)
+            score_text = self.font.render(f"Score: {self.score}", True, self.white)
             feedback = self.font.render(self.feedback_text, True, self.green)
 
             self.screen.blit(target_text, (50, 50))
@@ -107,13 +117,12 @@ class AngleMasterGame:
             self.screen.blit(feedback, (50, self.screen_height - 100))
             
             # Visual representation of the angle
-            self._draw_angle_visuals(p2 if 'p2' in locals() else (self.screen_width // 2, self.screen_height // 2))
+            self._draw_angle_visuals(lm_list[6] if 'p2' in locals() and len(lm_list) > 6 else (self.screen_width // 2, self.screen_height // 2))
 
 
             pygame.display.flip()
-            clock.tick(60)
+            self.clock.tick(60)
 
-        self.cap.release()
         return self.get_session_data()
 
     def _draw_angle_visuals(self, vertex):
@@ -140,11 +149,18 @@ class AngleMasterGame:
         """Returns the recorded data for the session."""
         total_deviation = sum(abs(t - a) for t, a in zip(self.target_angles, self.achieved_angles))
         avg_deviation = total_deviation / len(self.achieved_angles) if self.achieved_angles else 0
+        avg_speed = sum(self.hand_speeds) / len(self.hand_speeds) if self.hand_speeds else 0
+        avg_pinch_distance = sum(self.pinch_distances) / len(self.pinch_distances) if self.pinch_distances else 0
         
         return {
             "score": self.score,
             "target_angles": self.target_angles,
             "achieved_angles": self.achieved_angles,
-            "average_deviation": avg_deviation
+            "average_deviation": avg_deviation,
+            "max_angle": round(self.max_angle, 2),
+            "max_speed": round(self.max_speed, 2),
+            "avg_speed": round(avg_speed, 2),
+            "min_pinch_distance": round(self.min_pinch_distance, 2) if self.min_pinch_distance != float('inf') else 0,
+            "max_pinch_distance": round(self.max_pinch_distance, 2),
+            "avg_pinch_distance": round(avg_pinch_distance, 2)
         }
-

@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "game_name": "DinoGame",
+        "session_start_time": "2025-10-08T10:30:48.802396",
+        "version": "1.0"
+    },
+    "metrics": {
+        "score": 251,
+        "max_speed": 18,
+        "total_jumps": 5,
+        "successful_jumps": 3,
+        "success_rate": 60.0,
+        "pinch_count": 5
+    }
+}

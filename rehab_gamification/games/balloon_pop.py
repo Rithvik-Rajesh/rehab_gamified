@@ -38,15 +38,23 @@ class Balloon:
 
 # --- BalloonPopGame Class ---
 class BalloonPopGame(BaseGame):
-    def __init__(self, screen):
-        super().__init__(screen)
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
+        super().__init__(screen, hand_tracker, cap, calibration_data)
         self.balloons = []
         self.score = 0
         self.font = pygame.font.Font(None, 50)
         self.game_over_font = pygame.font.Font(None, 75)
         
+        # Tracking metrics
+        self.max_speed = 0
+        self.last_hand_pos = None
+        self.hand_speeds = []
+        self.min_pinch_distance = float('inf')
+        self.max_pinch_distance = 0
+        self.pinch_distances = []
+        
         try:
-            self.pop_sound = pygame.mixer.Sound('/Users/vishwavinayak/Desktop/Development/Rehab-Gamified/rehab_gamification/assets/pop.wav')
+            self.pop_sound = pygame.mixer.Sound('./rehab_gamification/assets/pop.wav')
         except pygame.error:
             print("Warning: 'pop.wav' not found. Sound will not play.")
             self.pop_sound = None
@@ -65,8 +73,6 @@ class BalloonPopGame(BaseGame):
                 print("Failed to grab camera frame.")
                 continue
             
-            # <<< --- THIS IS THE ONLY LINE THAT CHANGED --- >>>
-            # Set draw=True to show the full hand skeleton
             processed_frame = self.display_camera_feed(frame, draw=True)
 
             for event in pygame.event.get():
@@ -80,11 +86,34 @@ class BalloonPopGame(BaseGame):
                 self.spawn_balloon()
 
             lm_list = self.hand_tracker.get_landmark_positions(processed_frame, draw=False)
-            is_pinching, pinch_pos = self.hand_tracker.get_pinch_gesture(lm_list)
+            hand_pos = self.hand_tracker.get_hand_position(lm_list)
+            
+            # Calculate hand speed (keeping existing logic for compatibility)
+            if self.last_hand_pos and hand_pos != (0, 0):
+                speed = ((hand_pos[0] - self.last_hand_pos[0])**2 + (hand_pos[1] - self.last_hand_pos[1])**2)**0.5
+                self.hand_speeds.append(speed)
+                self.max_speed = max(self.max_speed, speed)
+            self.last_hand_pos = hand_pos
+            
+            # Calculate pinch distance (keeping existing logic for compatibility)
+            if len(lm_list) >= 9:
+                thumb_tip = lm_list[4]
+                index_tip = lm_list[8]
+                pinch_distance = self.hand_tracker.calculate_distance(thumb_tip, index_tip)
+                self.pinch_distances.append(pinch_distance)
+                self.min_pinch_distance = min(self.min_pinch_distance, pinch_distance)
+                self.max_pinch_distance = max(self.max_pinch_distance, pinch_distance)
+            
+            is_pinching, pinch_pos = self.hand_tracker.get_pinch_gesture(
+                lm_list, 
+                pinch_threshold=self.calibration_data.get("pinch_threshold", 40)
+            )
 
             if cam_w > 0 and cam_h > 0:
                 pinch_pos = (int(pinch_pos[0] * self.screen_width / cam_w), int(pinch_pos[1] * self.screen_height / cam_h))
 
+            # Check for balloon popping
+            balloon_popped = False
             for balloon in self.balloons[:]:
                 balloon.move()
                 if balloon.y < -balloon.radius:
@@ -94,8 +123,14 @@ class BalloonPopGame(BaseGame):
                     if balloon.is_popped_by(pinch_pos):
                         self.balloons.remove(balloon)
                         self.score += 1
+                        balloon_popped = True
                         if self.pop_sound:
                             self.pop_sound.play()
+                        break  # Only pop one balloon per pinch
+            
+            # Track pinch event with enhanced analytics
+            if is_pinching:
+                self.track_pinch_event(lm_list, was_successful=balloon_popped, target_position=pinch_pos)
 
             # --- Drawing ---
             for balloon in self.balloons:
@@ -139,7 +174,26 @@ class BalloonPopGame(BaseGame):
                     waiting_for_click = False
 
     def get_session_data(self):
-        return {
+        # Get enhanced session data from base class
+        enhanced_data = self.get_enhanced_session_data()
+        
+        # Add balloon-specific game metrics
+        avg_speed = sum(self.hand_speeds) / len(self.hand_speeds) if self.hand_speeds else 0
+        avg_pinch_distance = sum(self.pinch_distances) / len(self.pinch_distances) if self.pinch_distances else 0
+        
+        # Combine with existing balloon pop specific data
+        balloon_specific_data = {
             "score": self.score,
-            "balloons_popped": self.score 
+            "balloons_popped": self.score,
+            "max_speed": round(self.max_speed, 2),
+            "avg_speed": round(avg_speed, 2),
+            "min_pinch_distance": round(self.min_pinch_distance, 2) if self.min_pinch_distance != float('inf') else 0,
+            "max_pinch_distance": round(self.max_pinch_distance, 2),
+            "avg_pinch_distance": round(avg_pinch_distance, 2)
         }
+        
+        # Merge enhanced data with game-specific data
+        enhanced_data["game_specific_metrics"] = balloon_specific_data
+        enhanced_data["game_name"] = "BalloonPop"
+        
+        return enhanced_data

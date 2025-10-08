@@ -143,4 +143,12 @@ class HandTracker:
                 is_pinching = True
         
         return is_pinching, pinch_pos
+    
+    def set_calibration(self, calibration_data):
+        """
+        Applies calibration data to adjust tracking parameters.
+        :param calibration_data: Dictionary containing calibration parameters.
+        """
+        self.calibrated_pinch_threshold = calibration_data.get("pinch_threshold", 40)
+        self.sensitivity = calibration_data.get("sensitivity", 1.0)
 

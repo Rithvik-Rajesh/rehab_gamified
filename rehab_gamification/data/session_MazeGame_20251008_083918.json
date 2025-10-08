@@ -1,0 +1,40 @@
+{
+    "metadata": {
+        "game_name": "MazeGame",
+        "session_start_time": "2025-10-08T08:39:18.280085",
+        "version": "1.0"
+    },
+    "metrics": {
+        "session_metadata": {
+            "duration_seconds": 16.48,
+            "total_frames": 0,
+            "hand_detection_rate": 0
+        },
+        "hand_movement_analytics": {
+            "total_movements": 0,
+            "successful_interactions": 28,
+            "interaction_effectiveness": 0,
+            "avg_movement_speed": 0,
+            "total_movement_distance": 0,
+            "movement_smoothness_score": 0,
+            "tracking_lost_count": 0
+        },
+        "pinch_analytics": {
+            "total_pinch_attempts": 0,
+            "successful_pinches": 0,
+            "failed_pinches": 0,
+            "pinch_success_rate": 0,
+            "avg_pinch_distance": 0,
+            "avg_pinch_duration": 0,
+            "avg_time_between_pinches": 0,
+            "pinch_consistency": 0
+        },
+        "game_specific_metrics": {
+            "time_taken": 3.44,
+            "wall_touches": 24,
+            "completed": true,
+            "navigation_accuracy": -2300.0
+        },
+        "game_name": "MazeGame"
+    }
+}

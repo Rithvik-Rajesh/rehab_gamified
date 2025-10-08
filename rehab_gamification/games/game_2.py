@@ -3,13 +3,18 @@ import random
 import cv2
 import sys
 from rehab_gamification.hand_tracking.hand_tracker import HandTracker
+from rehab_gamification.games.base_game import BaseGame
 
-class FingerPainterGame:
-    """
-    A game where the player uses their index finger to 'paint' over targets.
-    """
-    def __init__(self, screen):
-        self.screen = screen
+class FingerPainterGame(BaseGame):
+    def __init__(self, screen, hand_tracker, cap, calibration_data=None):
+        """
+        Initializes the FingerPainterGame.
+        :param screen: The pygame screen to draw on.
+        :param hand_tracker: The shared HandTracker instance.
+        :param cap: The shared camera capture instance.
+        :param calibration_data: Calibration parameters.
+        """
+        super().__init__(screen, hand_tracker, cap, calibration_data)
         self.screen_width, self.screen_height = screen.get_size()
 
         # Colors and Fonts
@@ -26,15 +31,26 @@ class FingerPainterGame:
         self.targets = []
         self.cursor_pos = (0, 0)
         self.start_time = pygame.time.get_ticks()
-        self.time_limit = 30000  # 30 seconds
-
-        # Hand tracking
-        self.hand_tracker = HandTracker()
-        self.cap = cv2.VideoCapture(0)
+        self.time_limit = 15000  # 15 seconds
 
         # Data recording
         self.targets_hit = 0
         self.total_targets = 0
+
+        # Drawing state
+        self.is_drawing = False
+        self.last_pos = None
+        self.timer = 15  # 15-second timer
+        self.last_tick = pygame.time.get_ticks()
+        self.font = pygame.font.Font(None, 50)
+        
+        # Tracking metrics
+        self.max_speed = 0
+        self.last_hand_pos = None
+        self.hand_speeds = []
+        self.min_pinch_distance = float('inf')
+        self.max_pinch_distance = 0
+        self.pinch_distances = []
 
         self._create_targets(5)
 
@@ -53,8 +69,19 @@ class FingerPainterGame:
     def run(self):
         """The main game loop."""
         clock = pygame.time.Clock()
+        draw_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
 
         while not self.game_over:
+            # --- Timer Logic ---
+            if self.timer > 0:
+                if pygame.time.get_ticks() - self.last_tick >= 1000:
+                    self.timer -= 1
+                    self.last_tick = pygame.time.get_ticks()
+            else:
+                self.game_over = True
+                continue
+
+            # --- Event Handling ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.game_over = True
@@ -62,19 +89,35 @@ class FingerPainterGame:
                     if event.key == pygame.K_ESCAPE:
                         self.game_over = True
 
-            # Time limit check
-            elapsed_time = pygame.time.get_ticks() - self.start_time
-            if elapsed_time >= self.time_limit:
-                self.game_over = True
-
             # Hand tracking
             success, frame = self.cap.read()
             if not success:
                 continue
 
-            frame = cv2.flip(frame, 1)
-            frame = self.hand_tracker.find_hands(frame, draw=False)
-            lm_list = self.hand_tracker.get_landmark_positions(frame, draw=False)
+            processed_frame = self.display_camera_feed(frame, draw=False)
+            lm_list = self.hand_tracker.get_landmark_positions(processed_frame, draw=False)
+            is_pinching, pinch_pos = self.hand_tracker.get_pinch_gesture(
+                lm_list,
+                pinch_threshold=self.calibration_data.get("pinch_threshold", 40)
+            )
+            
+            hand_pos = self.hand_tracker.get_hand_position(lm_list)
+            
+            # Calculate hand speed
+            if self.last_hand_pos and hand_pos != (0, 0):
+                speed = ((hand_pos[0] - self.last_hand_pos[0])**2 + (hand_pos[1] - self.last_hand_pos[1])**2)**0.5
+                self.hand_speeds.append(speed)
+                self.max_speed = max(self.max_speed, speed)
+            self.last_hand_pos = hand_pos
+            
+            # Calculate pinch distance
+            if len(lm_list) >= 9:
+                thumb_tip = lm_list[4]
+                index_tip = lm_list[8]
+                pinch_distance = self.hand_tracker.calculate_distance(thumb_tip, index_tip)
+                self.pinch_distances.append(pinch_distance)
+                self.min_pinch_distance = min(self.min_pinch_distance, pinch_distance)
+                self.max_pinch_distance = max(self.max_pinch_distance, pinch_distance)
 
             if lm_list:
                 # Use index finger tip (landmark 8)
@@ -105,7 +148,7 @@ class FingerPainterGame:
 
             # Draw UI
             score_text = self.font.render(f"Score: {self.score}", True, self.black)
-            time_left = (self.time_limit - elapsed_time) // 1000
+            time_left = (self.time_limit - (pygame.time.get_ticks() - self.start_time)) // 1000
             time_text = self.font.render(f"Time: {time_left}", True, self.black)
             self.screen.blit(score_text, (10, 10))
             self.screen.blit(time_text, (self.screen_width - 150, 10))
@@ -113,18 +156,34 @@ class FingerPainterGame:
             pygame.display.flip()
             clock.tick(60)
 
-        self.cap.release()
+        # Show game over screen before returning
+        self.show_game_over_screen()
+        # Return enhanced session data
         return self.get_session_data()
-
+    
     def get_session_data(self):
-        """Returns the recorded data for the session."""
-        accuracy = (self.targets_hit / self.total_targets) * 100 if self.total_targets > 0 else 0
-        return {
-            "score": self.score,
-            "targets_hit": self.targets_hit,
-            "total_targets": self.total_targets,
-            "accuracy": round(accuracy, 2)
+        # Get enhanced session data from base class
+        enhanced_data = self.get_enhanced_session_data()
+        
+        avg_speed = sum(self.hand_speeds) / len(self.hand_speeds) if self.hand_speeds else 0
+        avg_pinch_distance = sum(self.pinch_distances) / len(self.pinch_distances) if self.pinch_distances else 0
+        
+        # Add finger painter specific metrics
+        finger_painter_data = {
+            "time_left": 0,
+            "max_speed": round(self.max_speed, 2),
+            "avg_speed": round(avg_speed, 2),
+            "min_pinch_distance": round(self.min_pinch_distance, 2) if self.min_pinch_distance != float('inf') else 0,
+            "max_pinch_distance": round(self.max_pinch_distance, 2),
+            "avg_pinch_distance": round(avg_pinch_distance, 2),
+            "score": 0  # Could track number of strokes or coverage
         }
+        
+        # Merge enhanced data with game-specific data
+        enhanced_data["game_specific_metrics"] = finger_painter_data
+        enhanced_data["game_name"] = "FingerPainter"
+        
+        return enhanced_data
 
 if __name__ == '__main__':
     # This part is for testing the game directly
@@ -132,7 +191,11 @@ if __name__ == '__main__':
     screen = pygame.display.set_mode((800, 600))
     pygame.display.set_caption("Finger Painter Test")
     
-    game = FingerPainterGame(screen)
+    # Initialize HandTracker and camera here for testing
+    hand_tracker = HandTracker()
+    cap = cv2.VideoCapture(0)
+    
+    game = FingerPainterGame(screen, hand_tracker, cap)
     session_data = game.run()
     
     print("Game Over!")
