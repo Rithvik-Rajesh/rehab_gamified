@@ -76,7 +76,7 @@ was added:
 
 ### New Visualization Files
 
-- `game_distribution.png` - Game play distribution
+- `gamey_distribution.png` - Game play distribution
 - `weekly_heatmap.png` - Activity timing patterns
 - `correlation_matrix.png` - Metric relationships
 - `kpi_dashboard.png` - Key performance indicators

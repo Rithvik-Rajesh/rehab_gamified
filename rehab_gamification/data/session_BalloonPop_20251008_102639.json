@@ -1,0 +1,43 @@
+{
+    "metadata": {
+        "game_name": "BalloonPop",
+        "session_start_time": "2025-10-08T10:26:39.221931",
+        "version": "1.0"
+    },
+    "metrics": {
+        "session_metadata": {
+            "duration_seconds": 25.75,
+            "total_frames": 353,
+            "hand_detection_rate": 93.2
+        },
+        "hand_movement_analytics": {
+            "total_movements": 325,
+            "successful_interactions": 2,
+            "interaction_effectiveness": 0.62,
+            "avg_movement_speed": 467.96,
+            "total_movement_distance": 10387.02,
+            "movement_smoothness_score": 40.72,
+            "tracking_lost_count": 1
+        },
+        "pinch_analytics": {
+            "total_pinch_attempts": 7,
+            "successful_pinches": 2,
+            "failed_pinches": 5,
+            "pinch_success_rate": 28.57,
+            "avg_pinch_distance": 26.57,
+            "avg_pinch_duration": 0.741,
+            "avg_time_between_pinches": 1.96,
+            "pinch_consistency": 63.03
+        },
+        "game_specific_metrics": {
+            "score": 9,
+            "balloons_popped": 9,
+            "max_speed": 252.4,
+            "avg_speed": 23.9,
+            "min_pinch_distance": 5.66,
+            "max_pinch_distance": 351.4,
+            "avg_pinch_distance": 127.27
+        },
+        "game_name": "BalloonPop"
+    }
+}
