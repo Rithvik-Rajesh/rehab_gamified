@@ -1,0 +1,35 @@
+{
+  "game_name": "FingerPainter",
+  "session_metadata": {
+    "duration_seconds": 42.61,
+    "total_frames": 1278,
+    "hand_detection_rate": 97.52
+  },
+  "hand_movement_analytics": {
+    "total_movements": 149,
+    "successful_interactions": 123,
+    "interaction_effectiveness": 82.55,
+    "avg_movement_speed": 18.38,
+    "total_movement_distance": 2270.66,
+    "movement_smoothness_score": 67.48,
+    "tracking_lost_count": 1
+  },
+  "pinch_analytics": {
+    "total_pinch_attempts": 21,
+    "successful_pinches": 17,
+    "failed_pinches": 4,
+    "pinch_success_rate": 80.95,
+    "avg_pinch_distance": 28.24,
+    "avg_pinch_duration": 0.464,
+    "avg_time_between_pinches": 3.92,
+    "pinch_consistency": 92.54
+  },
+  "game_specific_metrics": {
+    "score": 100,
+    "targets_hit": 10,
+    "total_targets": 14,
+    "accuracy": 71.43,
+    "max_speed": 13.28,
+    "avg_speed": 6.94
+  }
+}

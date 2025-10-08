@@ -158,10 +158,18 @@ class FingerPainterGame(BaseGame):
 
         # Show game over screen before returning
         self.show_game_over_screen()
-        # Return session data (can be expanded later)
+        # Return enhanced session data
+        return self.get_session_data()
+    
+    def get_session_data(self):
+        # Get enhanced session data from base class
+        enhanced_data = self.get_enhanced_session_data()
+        
         avg_speed = sum(self.hand_speeds) / len(self.hand_speeds) if self.hand_speeds else 0
         avg_pinch_distance = sum(self.pinch_distances) / len(self.pinch_distances) if self.pinch_distances else 0
-        return {
+        
+        # Add finger painter specific metrics
+        finger_painter_data = {
             "time_left": 0,
             "max_speed": round(self.max_speed, 2),
             "avg_speed": round(avg_speed, 2),
@@ -170,6 +178,12 @@ class FingerPainterGame(BaseGame):
             "avg_pinch_distance": round(avg_pinch_distance, 2),
             "score": 0  # Could track number of strokes or coverage
         }
+        
+        # Merge enhanced data with game-specific data
+        enhanced_data["game_specific_metrics"] = finger_painter_data
+        enhanced_data["game_name"] = "FingerPainter"
+        
+        return enhanced_data
 
 if __name__ == '__main__':
     # This part is for testing the game directly

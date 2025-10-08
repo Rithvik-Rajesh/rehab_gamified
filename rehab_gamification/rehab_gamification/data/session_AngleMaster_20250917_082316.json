@@ -1,0 +1,33 @@
+{
+  "game_name": "AngleMaster",
+  "session_metadata": {
+    "duration_seconds": 178.15,
+    "total_frames": 5344,
+    "hand_detection_rate": 82.26
+  },
+  "hand_movement_analytics": {
+    "total_movements": 155,
+    "successful_interactions": 83,
+    "interaction_effectiveness": 53.55,
+    "avg_movement_speed": 22.97,
+    "total_movement_distance": 1150.2,
+    "movement_smoothness_score": 33.35,
+    "tracking_lost_count": 4
+  },
+  "pinch_analytics": {
+    "total_pinch_attempts": 13,
+    "successful_pinches": 7,
+    "failed_pinches": 6,
+    "pinch_success_rate": 53.85,
+    "avg_pinch_distance": 41.13,
+    "avg_pinch_duration": 0.324,
+    "avg_time_between_pinches": 3.77,
+    "pinch_consistency": 91.89
+  },
+  "game_specific_metrics": {
+    "angle_accuracy": 70.65,
+    "target_angles_hit": 3,
+    "total_targets": 15,
+    "avg_hold_time": 2.34
+  }
+}

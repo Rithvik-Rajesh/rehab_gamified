@@ -1,0 +1,33 @@
+{
+  "game_name": "DinoGame",
+  "session_metadata": {
+    "duration_seconds": 96.27,
+    "total_frames": 2888,
+    "hand_detection_rate": 91.81
+  },
+  "hand_movement_analytics": {
+    "total_movements": 149,
+    "successful_interactions": 106,
+    "interaction_effectiveness": 71.14,
+    "avg_movement_speed": 12.47,
+    "total_movement_distance": 4481.73,
+    "movement_smoothness_score": 51.44,
+    "tracking_lost_count": 2
+  },
+  "pinch_analytics": {
+    "total_pinch_attempts": 22,
+    "successful_pinches": 15,
+    "failed_pinches": 7,
+    "pinch_success_rate": 68.18,
+    "avg_pinch_distance": 44.85,
+    "avg_pinch_duration": 0.325,
+    "avg_time_between_pinches": 2.39,
+    "pinch_consistency": 75.28
+  },
+  "game_specific_metrics": {
+    "score": 107,
+    "jumps_made": 8,
+    "obstacles_avoided": 5,
+    "game_duration": 119.58
+  }
+}
