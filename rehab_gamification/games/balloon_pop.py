@@ -54,7 +54,7 @@ class BalloonPopGame(BaseGame):
         self.pinch_distances = []
         
         try:
-            self.pop_sound = pygame.mixer.Sound('/Users/vishwavinayak/Desktop/Development/Rehab-Gamified/rehab_gamification/assets/pop.wav')
+            self.pop_sound = pygame.mixer.Sound('./rehab_gamification/assets/pop.wav')
         except pygame.error:
             print("Warning: 'pop.wav' not found. Sound will not play.")
             self.pop_sound = None
